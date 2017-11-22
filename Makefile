@@ -43,4 +43,4 @@ enable:
 push: clean docker rootfs create enable
 	@echo "### Push the ${PLUGIN_NAME}:${PLUGIN_TAG} plugin to the repository"
 	@docker tag ${PLUGIN_NAME}:${PLUGIN_TAG} localhost:5000/${PLUGIN_NAME}:${PLUGIN_TAG}
-	@docker plugin push ${PLUGIN_NAME}:${PLUGIN_TAG}
+	@docker plugin push localhost:5000/${PLUGIN_NAME}:${PLUGIN_TAG}
