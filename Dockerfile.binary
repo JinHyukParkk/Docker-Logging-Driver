@@ -3,10 +3,8 @@ FROM golang:1.8
 COPY . /go/src/github.com/JinHyukParkk/LoggingDriverTest
 WORKDIR /go/src/github.com/JinHyukParkk/LoggingDriverTest
 
-ENV GOPATH /home/docker/project
-ENV GOROOT /usr/local/go
-ENV PATH $GOROOT/bin:$GOPATH/bin:$PATH
+ENV CGO_ENABLED=0
 
 RUN go install
 
-CMD ["/home/docker/project/bin/test-docker-logging-plugin"]
+CMD ["/go/bin/test-docker-logging-plugin"]
