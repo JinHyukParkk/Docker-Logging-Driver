@@ -138,11 +138,11 @@ func (d *FileDriver) StartLogging(fifopath string, loginfo logger.Info) error {
 	}
 	d.mu.Unlock()
 
-	if _, ok := loginfo.Config["stderr"]; !ok {
+	if _, ok := loginfo.Config["stderr"]; ok {
 		return fmt.Errorf("'stderr' path missing from the plugin configuration")
 	}
 
-	if _, ok := loginfo.Config["stdout"]; !ok {
+	if _, ok := loginfo.Config["stdout"]; ok {
 		return fmt.Errorf("'stdout' path missing from the plugin configuration")
 	}
 
