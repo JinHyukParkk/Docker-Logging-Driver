@@ -1,7 +1,7 @@
 {
     "description" : "A Docker logging plugin for the Discovery Environment job execution platform.",
-    "documentation" : "https://github.com/cyverse-de/de-docker-logging-plugin",
-    "entrypoint" : ["/de-docker-logging-plugin"],
+    "documentation" : "https://github.com/JinHyukParkk/LoggingDriverTest",
+    "entrypoint" : ["/test-docker-logging-plugin"],
     "interface" : {
         "types" : ["docker.logdriver/1.0"],
         "socket" : "delogplugin.sock"
@@ -29,8 +29,8 @@
       {
         "name" : "de-log-directory",
         "description" : "The host directory that logs will be written to.",
-        "source" : "/var/log/de-docker-logging-plugin/",
-        "destination" : "/var/log/de-docker-logging-plugin/",
+        "source" : "/var/log/test-docker-logging-plugin/",
+        "destination" : "/var/log/test-docker-logging-plugin/",
         "type" : "none",
         "options" : [
           "rbind"
