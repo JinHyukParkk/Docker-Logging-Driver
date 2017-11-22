@@ -14,7 +14,7 @@ docker:
 	@docker build -t builder -f Dockerfile.binary .
 	@echo "### Copy the plugin binary"
 	@docker create --name tmp builder
-	@docker cp $HOME/project/bin/test-docker-logging-plugin .
+	@docker cp $tmp:/home/docker/project/bin/test-docker-logging-plugin .
 	@docker rm -fv tmp
 	@docker rmi builder
 	@echo "### Create the rootfs image"
