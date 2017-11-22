@@ -1,0 +1,43 @@
+{
+    "description" : "A Docker logging plugin for the Discovery Environment job execution platform.",
+    "documentation" : "https://github.com/cyverse-de/de-docker-logging-plugin",
+    "entrypoint" : ["/de-docker-logging-plugin"],
+    "interface" : {
+        "types" : ["docker.logdriver/1.0"],
+        "socket" : "delogplugin.sock"
+    },
+    "env" : [
+        {
+            "name" : "uid",
+            "description" : "The uid of the user that should own the log files. Defaults to a uid of 0.",
+            "value" : "0",
+            "settable" : [
+                "value"
+            ]
+        },
+        {
+            "name" : "gid",
+            "description" : "The gid of the group that should own the log files. Defaults to a gid of 0.",
+            "value" : "0",
+            "settable" : [
+                "value"
+            ]
+        }
+
+    ],
+    "mounts" : [
+      {
+        "name" : "de-log-directory",
+        "description" : "The host directory that logs will be written to.",
+        "source" : "/var/log/de-docker-logging-plugin/",
+        "destination" : "/var/log/de-docker-logging-plugin/",
+        "type" : "none",
+        "options" : [
+          "rbind"
+        ],
+        "settable" : [
+          "source"
+        ]
+      }
+    ]
+}
