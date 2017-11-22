@@ -1,7 +1,7 @@
 FROM golang:1.8
 
-COPY . /go/src/github.com/JinHyukParkk/LoggingDriverTest
-WORKDIR /go/src/github.com/JinHyukParkk/LoggingDriverTest
+COPY . /project/src/github.com/JinHyukParkk/LoggingDriverTest
+WORKDIR /project/src/github.com/JinHyukParkk/LoggingDriverTest
 
 ENV CGO_ENABLED=0
 
