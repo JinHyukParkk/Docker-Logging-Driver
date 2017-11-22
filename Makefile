@@ -3,7 +3,7 @@
 PLUGIN_NAME=test/test-docker-logging-plugin
 PLUGIN_TAG=master
 
-all: clean docker rootfs create
+all: push
 
 clean:
 	@echo "### Removing the ./plugin directory"
