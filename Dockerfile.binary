@@ -5,6 +5,7 @@ WORKDIR /go/src/github.com/JinHyukParkk/LoggingDriverTest
 
 ENV CGO_ENABLED=0
 
+RUN echo "Install start"
 RUN go install
 
-CMD ["/go/bin/de-docker-logging-plugin"]
+CMD ["/go/bin/test-docker-logging-plugin"]
