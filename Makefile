@@ -1,6 +1,6 @@
 # Shamelessly adapted from the Makefile at vieux/docker-volume-sshfs
 
-PLUGIN_NAME=test/test-docker-logging-plugin
+PLUGIN_NAME=LoggingDriverTest
 PLUGIN_TAG=master
 
 all: push
@@ -37,7 +37,7 @@ create:
 
 enable:
 	@echo "### Enabling the ${PLUGIN_NAME}:${PLUGIN_TAG} plugin"
-	@mkdir -p /var/log/test-docker-logging-plugin/
+	@mkdir -p /var/log/LoggingDriverTest/
 	@docker plugin enable ${PLUGIN_NAME}:${PLUGIN_TAG}
 
 push: clean docker rootfs create enable

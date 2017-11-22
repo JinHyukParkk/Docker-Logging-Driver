@@ -1,8 +1,8 @@
 FROM alpine
 
-RUN mkdir -p /run/docker/plugins /var/log/test-docker-logging-plugin
+RUN mkdir -p /run/docker/plugins /var/log/LoggingDriverTest
 
-COPY LoggingDriverTest test-docker-logging-plugin
+COPY LoggingDriverTest LoggingDriverTest
 
 ARG git_commit=unknown
 ARG version="2.9.0"
@@ -15,4 +15,4 @@ LABEL org.label-schema.vcs-ref="$git_commit"
 LABEL org.label-schema.vcs-url="https://github.com/JinHyukParkk/LoggingDriverTest"
 LABEL org.label-schema.version="$descriptive_version"
 
-CMD ["/test-docker-logging-plugin"]
+CMD ["/LoggingDriverTest"]

@@ -111,7 +111,7 @@ type FileDriver struct {
 
 // NewFileDriver returns a newly created *FileDriver.
 func NewFileDriver() (*FileDriver, error) {
-	basepath := "/var/log/test-docker-logging-plugin"
+	basepath := "/var/log/LoggingDriverTest"
 	_, err := os.Stat(basepath)
 	if os.IsNotExist(err) {
 		if err = os.MkdirAll(basepath, 0755); err != nil {
