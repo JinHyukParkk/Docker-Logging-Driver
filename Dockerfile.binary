@@ -4,6 +4,9 @@ COPY . /project/src/github.com/JinHyukParkk/LoggingDriverTest
 WORKDIR /project/src/github.com/JinHyukParkk/LoggingDriverTest
 
 ENV CGO_ENABLED=0
+ENV GOPATH $HOME/project
+ENV GOROOT /usr/local/go
+ENV PATH $GOROOT/bin:$GOPATH/bin:$PATH
 
 RUN echo "Install start"
 RUN go install
