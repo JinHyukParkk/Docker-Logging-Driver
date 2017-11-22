@@ -1,6 +1,6 @@
 # Shamelessly adapted from the Makefile at vieux/docker-volume-sshfs
 
-PLUGIN_NAME=test/test-docker-logging-plugin
+PLUGIN_NAME=discoenv/de-docker-logging-plugin
 PLUGIN_TAG=master
 
 all: clean docker rootfs create
@@ -14,7 +14,7 @@ docker:
 	@docker build -t builder -f Dockerfile.binary .
 	@echo "### Copy the plugin binary"
 	@docker create --name tmp builder
-	@docker cp tmp:/go/bin/test-docker-logging-plugin .
+	@docker cp tmp:/go/bin/de-docker-logging-plugin .
 	@docker rm -fv tmp
 	@docker rmi builder
 	@echo "### Create the rootfs image"
@@ -37,7 +37,7 @@ create:
 
 enable:
 	@echo "### Enabling the ${PLUGIN_NAME}:${PLUGIN_TAG} plugin"
-	@mkdir -p /var/log/test-docker-logging-plugin/
+	@mkdir -p /var/log/de-docker-logging-plugin/
 	@docker plugin enable ${PLUGIN_NAME}:${PLUGIN_TAG}
 
 push: clean docker rootfs create enable

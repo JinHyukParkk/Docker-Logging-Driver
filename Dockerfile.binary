@@ -1,10 +1,10 @@
 FROM golang:1.8
 
-COPY . /go/src/github.com/JinHyukParkk/LoggingDriverTest
-WORKDIR /go/src/github.com/JinHyukParkk/LoggingDriverTest
+COPY . /go/src/github.com/cyverse-de/de-docker-logging-plugin
+WORKDIR /go/src/github.com/cyverse-de/de-docker-logging-plugin
 
 ENV CGO_ENABLED=0
 
 RUN go install
 
-CMD ["/go/bin/test-docker-logging-plugin"]
+CMD ["/go/bin/de-docker-logging-plugin"]
