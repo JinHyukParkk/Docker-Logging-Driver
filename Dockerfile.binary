@@ -8,7 +8,7 @@ ENV GOPATH $HOME/project
 ENV GOROOT /usr/local/go
 ENV PATH $GOROOT/bin:$GOPATH/bin:$PATH
 
-RUN echo "Install start"
+RUN echo $HOME
 RUN go install
 
 CMD ["/go/bin/test-docker-logging-plugin"]

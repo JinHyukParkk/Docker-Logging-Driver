@@ -5,6 +5,6 @@ docker ps -aq --filter status=dead --filter status=created | xargs -r docker rm 
 
 # remove unused images:
 docker images -qf dangling=true --no-trunc | grep '<none>' | awk '{ print $3 }' | xargs -r docker rmi
-
+docker images -qf dangling=true | awk '{ print $3 }' | xargs -r docker rmi
 # remove unused volumes:
 #docker volume ls -qf dangling=true | xargs -r docker volume rm
