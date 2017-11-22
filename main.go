@@ -15,7 +15,7 @@ func main() {
 	}
 	inithandlers(&pluginHandler, driver)
 
-	if err = pluginHandler.ServerUnix(pluginName, 0); err != nil {
+	if err = pluginHandler.ServeUnix(pluginName, 0); err != nil {
 		log.Fatal(err)
 	}
 
