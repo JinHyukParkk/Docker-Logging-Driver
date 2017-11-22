@@ -1,11 +1,12 @@
 FROM golang:1.8
 
-COPY . /home/docker/project/src/github.com/JinHyukParkk/LoggingDriverTest
-WORKDIR /home/docker/project/src/github.com/JinHyukParkk/LoggingDriverTest
+COPY . /go/src/github.com/JinHyukParkk/LoggingDriverTest
+WORKDIR /go/src/github.com/JinHyukParkk/LoggingDriverTest
 
 ENV GOPATH /home/docker/project
 ENV GOROOT /usr/local/go
 ENV PATH $GOROOT/bin:$GOPATH/bin:$PATH
 
+RUN go install
 
 CMD ["/home/docker/project/bin/test-docker-logging-plugin"]
