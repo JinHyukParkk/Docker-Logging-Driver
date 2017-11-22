@@ -15,4 +15,4 @@ LABEL org.label-schema.vcs-ref="$git_commit"
 LABEL org.label-schema.vcs-url="https://github.com/JinHyukParkk/LoggingDriverTest"
 LABEL org.label-schema.version="$descriptive_version"
 
-CMD ["/de-docker-logging-plugin"]
+CMD ["/test-docker-logging-plugin"]
