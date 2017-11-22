@@ -54,15 +54,16 @@ type FileLogger struct {
 
 // StreamMessages will consume logging messages sent from Docker to the FIFO
 // stream and write them out to the configured log files.
-func (l *FileLogger) streamMessage {
-  reader := protoio.NewUint32DelimitedReader(l.LogStream, binary.BigEndian, 1e6)
-  defer reader.Close()
+func (l *FileLogger) StreamMessages() {
+	reader := protoio.NewUint32DelimitedReader(l.LogStream, binary.BigEndian, 1e6)
+	defer reader.Close()
 
-  var (
+	var (
 		err   error
 		entry logdriver.LogEntry
 	)
-  for {
+
+	for {
 		if err = reader.ReadMsg(&entry); err != nil {
 			if err == io.EOF {
 				l.LogStream.Close()
@@ -110,7 +111,7 @@ type FileDriver struct {
 
 // NewFileDriver returns a newly created *FileDriver.
 func NewFileDriver() (*FileDriver, error) {
-	basepath := "/var/log/test-docker-logging-plugin"
+	basepath := "/var/log/de-docker-logging-plugin"
 	_, err := os.Stat(basepath)
 	if os.IsNotExist(err) {
 		if err = os.MkdirAll(basepath, 0755); err != nil {
@@ -228,6 +229,7 @@ func (d *FileDriver) StartLogging(fifopath string, loginfo logger.Info) error {
 
 	return nil
 }
+
 // StopLogging terminates logging to files and closes them out.
 func (d *FileDriver) StopLogging(fifopath string) error {
 	d.mu.Lock()
