@@ -1,7 +1,7 @@
 #!/bin/sh
 
 echo -e "-- Removing exited containers --\n"
-docker ps --all --quiet --filter="status=exited" | xargs --no-run-if-empty docker rm --volumes
+docker ps --all --quiet --filter="status=created" | xargs --no-run-if-empty docker rm --volumes
 
 echo -e "\n\n-- Removing untagged images --\n"
 docker rmi --force $(docker images | awk '/^<none>/ { print $3 }')
