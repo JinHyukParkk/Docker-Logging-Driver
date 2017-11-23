@@ -12,7 +12,7 @@ func main() {
 		err error
 	)
 
-	pluginName := "delogplugin"
+	pluginName := "LogginDriver"
 
 	sdkhandler := sdk.NewHandler(`{"Implements": ["LoggingDriver"]}`)
 	driver, err := NewFileDriver()

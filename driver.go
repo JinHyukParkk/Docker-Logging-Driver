@@ -137,12 +137,13 @@ func (d *FileDriver) StartLogging(fifopath string, loginfo logger.Info) error {
 		return fmt.Errorf("logging is already configured for %s", fifopath)
 	}
 	d.mu.Unlock()
-
-	if _, ok := loginfo.Config["stderr"]; ok {
+	// logger.Info 넣어 볼것.  os.File 쪽에 이슈.
+	fmt.Println("!!!!", loginfo.Config["Stderr"])
+	if _, ok := loginfo.Config["Stderr"]; !ok {
 		return fmt.Errorf("'stderr' path missing from the plugin configuration")
 	}
 
-	if _, ok := loginfo.Config["stdout"]; ok {
+	if _, ok := loginfo.Config["Stdout"]; !ok {
 		return fmt.Errorf("'stdout' path missing from the plugin configuration")
 	}
 
@@ -157,8 +158,8 @@ func (d *FileDriver) StartLogging(fifopath string, loginfo logger.Info) error {
 		return errors.Wrap(err, "failed to convert the uid env var to an int")
 	}
 
-	stderrPath := path.Join(baseDir, loginfo.Config["stderr"])
-	stdoutPath := path.Join(baseDir, loginfo.Config["stdout"])
+	stderrPath := path.Join(baseDir, loginfo.Config["Stderr"])
+	stdoutPath := path.Join(baseDir, loginfo.Config["Stdout"])
 
 	stderrBase := path.Dir(stderrPath)
 	stdoutBase := path.Dir(stdoutPath)
