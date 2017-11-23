@@ -1,6 +1,6 @@
 # Shamelessly adapted from the Makefile at vieux/docker-volume-sshfs
 
-PLUGIN_NAME=test/logging-driver-test
+PLUGIN_NAME=test/test-docker-logging-plugin
 PLUGIN_TAG=master
 
 all: push
