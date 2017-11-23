@@ -2,7 +2,7 @@ FROM alpine
 
 RUN mkdir -p /run/docker/plugins /var/log/LoggingDriverTest
 
-COPY LoggingDriverTest LoggingDriverTest
+COPY LoggingDriverTest /LoggingDriverTest
 
 ARG git_commit=unknown
 ARG version="2.9.0"
