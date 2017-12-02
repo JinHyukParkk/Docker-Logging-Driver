@@ -1,9 +1,9 @@
 # Shamelessly adapted from the Makefile at vieux/docker-volume-sshfs
 
-PLUGIN_NAME=test/test-docker-logging-plugin
-PLUGIN_TAG=master
+PLUGIN_NAME=docker-plugin
+PLUGIN_TAG=latest
 
-all: push
+all: clean docker create enable
 
 clean:
 	@echo "### Removing the ./plugin directory"
@@ -11,23 +11,15 @@ clean:
 
 docker:
 	@echo "### Building the plugin binary"
-	@docker build -t builder -f Dockerfile.binary .
-	@echo "### Copy the plugin binary"
+	@docker build -t builder -f Dockerfile .
+	@echo "### Create builder container"
 	@docker create --name tmp builder
-	@docker cp tmp:/go/bin/LoggingDriverTest .
-	@docker rm -fv tmp
-	@docker rmi builder
-	@echo "### Create the rootfs image"
-	@docker build -t ${PLUGIN_NAME}:rootfs .
-
-rootfs:
-	@echo "### Create rootfs directory in ./plugin/rootfs"
+	@echo "### Copy config.json & roofs to plugin root"
 	@mkdir -p ./plugin/rootfs
-	@docker create --name rootfs-tmp ${PLUGIN_NAME}:rootfs
-	@docker export rootfs-tmp | tar -x -C ./plugin/rootfs
-	@echo "### Copy config.json to ./plugin/"
+	@docker cp tmp:/ ./plugin/rootfs/
 	@cp config.json ./plugin/
-	@docker rm -fv rootfs-tmp
+	@docker rm -f tmp
+	@docker rmi builder
 
 create:
 	@echo "### Remove the ${PLUGIN_NAME} plugin from Docker"
@@ -37,10 +29,8 @@ create:
 
 enable:
 	@echo "### Enabling the ${PLUGIN_NAME}:${PLUGIN_TAG} plugin"
-	@mkdir -p /var/log/LoggingDriverTest/
 	@docker plugin enable ${PLUGIN_NAME}:${PLUGIN_TAG}
 
 push: clean docker rootfs create enable
 	@echo "### Push the ${PLUGIN_NAME}:${PLUGIN_TAG} plugin to the repository"
-	@docker tag ${PLUGIN_NAME}:${PLUGIN_TAG} localhost:5000/${PLUGIN_NAME}:${PLUGIN_TAG}
-	@docker plugin push localhost:5000/${PLUGIN_NAME}:${PLUGIN_TAG}
+	@docker plugin push ${PLUGIN_NAME}:${PLUGIN_TAG}

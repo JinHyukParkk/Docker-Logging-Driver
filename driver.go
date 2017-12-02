@@ -5,242 +5,169 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"os"
-	"path"
-	"strconv"
-	"strings"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/plugins/logdriver"
 	"github.com/docker/docker/daemon/logger"
+	"github.com/docker/docker/daemon/logger/jsonfilelog"
 	protoio "github.com/gogo/protobuf/io"
 	"github.com/pkg/errors"
 	"github.com/tonistiigi/fifo"
 )
 
-// LoggingDriver defines the interface for types that want to be a Docker logging
-// plugin for the DE.
-type LoggingDriver interface {
-	StartLogging(file string, info logger.Info) error
-	StopLogging(file string) error
+type driver struct {
+	mu     sync.Mutex
+	logs   map[string]*logPair
+	idx    map[string]*logPair
+	logger logger.Logger
 }
 
-// FakeDriver doesn't actually do anything except log when it receives a message.
-type FakeDriver struct{}
+type logPair struct {
+	l      logger.Logger
+	stream io.ReadCloser
+	info   logger.Info
+}
 
-// StartLogging doesn't do anything except log that it was called.
-func (f *FakeDriver) StartLogging(file string, info logger.Info) error {
-	log.Printf("StartLogging called with file %s for container %s\n", file, info.ContainerID)
+func newDriver() *driver {
+	return &driver{
+		logs: make(map[string]*logPair),
+		idx:  make(map[string]*logPair),
+	}
+}
+
+func (d *driver) StartLogging(file string, logCtx logger.Info) error {
+	d.mu.Lock()
+	if _, exists := d.logs[file]; exists {
+		d.mu.Unlock()
+		return fmt.Errorf("logger for %q already exists", file)
+	}
+	d.mu.Unlock()
+	if c_key, ok := logCtx.ContainerLabels["logging-key"]; ok {
+		logCtx.LogPath = filepath.Join("/var/log/docker", c_key, ".log")
+	}
+	if logCtx.LogPath == "" {
+		logCtx.LogPath = filepath.Join("/var/log/docker", logCtx.ContainerID+".log")
+	}
+
+	if err := os.MkdirAll(filepath.Dir(logCtx.LogPath), 0755); err != nil {
+		return errors.Wrap(err, "error setting up logger dir")
+	}
+	l, err := jsonfilelog.New(logCtx)
+	if err != nil {
+		return errors.Wrap(err, "error creating jsonfile logger")
+	}
+
+	logrus.WithField("id", logCtx.ContainerID).WithField("file", file).WithField("logpath", logCtx.LogPath).Debugf("Start logging")
+	f, err := fifo.OpenFifo(context.Background(), file, syscall.O_RDONLY, 0700)
+	if err != nil {
+		return errors.Wrapf(err, "error opening logger fifo: %q", file)
+	}
+
+	d.mu.Lock()
+	lf := &logPair{l, f, logCtx}
+	d.logs[file] = lf
+	d.idx[logCtx.ContainerID] = lf
+	d.mu.Unlock()
+
+	go consumeLog(lf)
 	return nil
 }
 
-// StopLogging doesn't do anything except log that it was called.
-func (f *FakeDriver) StopLogging(file string) error {
-	log.Printf("StopLogging was called with file %s\n", file)
+func (d *driver) StopLogging(file string) error {
+	logrus.WithField("file", file).Debugf("Stop logging")
+	d.mu.Lock()
+	lf, ok := d.logs[file]
+	_, is := lf.info.ContainerLabels["logging-key"]
+	if ok {
+		lf.stream.Close()
+		delete(d.logs, file)
+		if is {
+			os.Remove(lf.info.LogPath)
+		}
+	}
+	d.mu.Unlock()
 	return nil
 }
 
-// FileLogger tracks the info needed to write out log messages to files.
-type FileLogger struct {
-	StderrPath string
-	StdoutPath string
-	Stdout     *os.File
-	Stderr     *os.File
-	LogStream  io.ReadCloser
-}
-
-// StreamMessages will consume logging messages sent from Docker to the FIFO
-// stream and write them out to the configured log files.
-func (l *FileLogger) StreamMessages() {
-	reader := protoio.NewUint32DelimitedReader(l.LogStream, binary.BigEndian, 1e6)
-	defer reader.Close()
-
-	var (
-		err   error
-		entry logdriver.LogEntry
-	)
-
+func consumeLog(lf *logPair) {
+	dec := protoio.NewUint32DelimitedReader(lf.stream, binary.BigEndian, 1e6)
+	defer dec.Close()
+	var buf logdriver.LogEntry
 	for {
-		if err = reader.ReadMsg(&entry); err != nil {
+		if err := dec.ReadMsg(&buf); err != nil {
 			if err == io.EOF {
-				l.LogStream.Close()
+				logrus.WithField("id", lf.info.ContainerID).WithError(err).Debug("shutting down log logger")
+				lf.stream.Close()
 				return
 			}
-			reader = protoio.NewUint32DelimitedReader(l.LogStream, binary.BigEndian, 1e6)
+			dec = protoio.NewUint32DelimitedReader(lf.stream, binary.BigEndian, 1e6)
 		}
+		var msg logger.Message
+		msg.Line = buf.Line
+		msg.Source = buf.Source
+		msg.Partial = buf.Partial
+		msg.Timestamp = time.Unix(0, buf.TimeNano)
 
-		msg := logger.Message{
-			Line:      append(entry.Line, []byte("\n")...),
-			Source:    entry.Source,
-			Partial:   entry.Partial,
-			Timestamp: time.Unix(0, entry.TimeNano),
-		}
-
-		switch msg.Source {
-		case "stderr":
-			if _, err = l.Stderr.Write(msg.Line); err != nil {
-				err = errors.Wrap(err, "error writing to stderr log file")
-				log.Println(err.Error())
-				continue
-			}
-		case "stdout":
-			if _, err = l.Stdout.Write(msg.Line); err != nil {
-				err = errors.Wrap(err, "error writing to stdout log file")
-				log.Println(err.Error())
-				continue
-			}
-		default:
-			log.Println(fmt.Errorf("Unknown source %s for message: %s", msg.Source, msg.Line))
+		if err := lf.l.Log(&msg); err != nil {
+			logrus.WithField("id", lf.info.ContainerID).WithError(err).WithField("message", msg).Error("error writing log message")
 			continue
 		}
 
-		entry.Reset()
+		buf.Reset()
 	}
 }
 
-// FileDriver is a logging driver that will write out the stderr and stdout
-// streams to a configured directory.
-type FileDriver struct {
-	mu     sync.Mutex
-	logmap map[string]*FileLogger
-	base   string
-}
-
-// NewFileDriver returns a newly created *FileDriver.
-func NewFileDriver() (*FileDriver, error) {
-	basepath := "/var/log/LoggingDriverTest"
-	_, err := os.Stat(basepath)
-	if os.IsNotExist(err) {
-		if err = os.MkdirAll(basepath, 0755); err != nil {
-			return nil, errors.Wrapf(err, "error creating directory %s", basepath)
-		}
-	}
-	if err != nil {
-		return nil, errors.Wrapf(err, "error stat'ing %s", basepath)
-	}
-	return &FileDriver{
-		logmap: make(map[string]*FileLogger),
-		base:   basepath,
-	}, nil
-}
-
-// StartLogging sets up everything needed for logging to separate files for
-// stdout and stderr. Fires up a goroutine that pipes info from the FIFO created
-// by Docker into each file.
-func (d *FileDriver) StartLogging(fifopath string, loginfo logger.Info) error {
+func (d *driver) ReadLogs(info logger.Info, config logger.ReadConfig) (io.ReadCloser, error) {
 	d.mu.Lock()
-	if _, ok := d.logmap[fifopath]; ok {
-		d.mu.Unlock()
-		return fmt.Errorf("logging is already configured for %s", fifopath)
-	}
+	lf, exists := d.idx[info.ContainerID]
 	d.mu.Unlock()
-	// logger.Info 넣어 볼것.  os.File 쪽에 이슈.
-	fmt.Println("!!!!", loginfo.Config["Stderr"])
-	if _, ok := loginfo.Config["Stderr"]; !ok {
-		return fmt.Errorf("'stderr' path missing from the plugin configuration")
+	if !exists {
+		return nil, fmt.Errorf("logger does not exist for %s", info.ContainerID)
 	}
 
-	if _, ok := loginfo.Config["Stdout"]; !ok {
-		return fmt.Errorf("'stdout' path missing from the plugin configuration")
+	r, w := io.Pipe()
+	lr, ok := lf.l.(logger.LogReader)
+	if !ok {
+		return nil, fmt.Errorf("logger does not support reading")
 	}
 
-	baseDir := d.base
+	go func() {
+		watcher := lr.ReadLogs(config)
 
-	gid, err := strconv.Atoi(os.Getenv("gid"))
-	if err != nil {
-		return errors.Wrap(err, "failed to convert the gid env var to an int")
-	}
-	uid, err := strconv.Atoi(os.Getenv("uid"))
-	if err != nil {
-		return errors.Wrap(err, "failed to convert the uid env var to an int")
-	}
+		enc := protoio.NewUint32DelimitedWriter(w, binary.BigEndian)
+		defer enc.Close()
+		defer watcher.Close()
 
-	stderrPath := path.Join(baseDir, loginfo.Config["Stderr"])
-	stdoutPath := path.Join(baseDir, loginfo.Config["Stdout"])
-
-	stderrBase := path.Dir(stderrPath)
-	stdoutBase := path.Dir(stdoutPath)
-
-	for _, p := range []string{stderrBase, stdoutBase} {
-		pinfo, err := os.Stat(p)
-		if os.IsNotExist(err) {
-			if err = os.MkdirAll(p, 0755); err != nil {
-				return errors.Wrapf(err, "error creating %s", p)
-			}
-			continue
-		}
-		if err != nil {
-			return errors.Wrapf(err, "error stat'ing path %s", p)
-		}
-		if !pinfo.IsDir() {
-			return errors.Wrapf(err, "path was not a directory %s", p)
-		}
-	}
-
-	for _, p := range []string{loginfo.Config["stderr"], loginfo.Config["stdout"]} {
-		acc := baseDir
-		parentdir := path.Dir(p)
-		for _, d := range strings.Split(parentdir, string(os.PathSeparator)) {
-			if d != "" {
-				acc = path.Join(acc, d)
-				if err = os.Chown(acc, uid, gid); err != nil {
-					return errors.Wrapf(err, "failed to chown %s to %d:%d", acc, uid, gid)
+		var buf logdriver.LogEntry
+		for {
+			select {
+			case msg, ok := <-watcher.Msg:
+				if !ok {
+					w.Close()
+					return
 				}
+
+				buf.Line = msg.Line
+				buf.Partial = msg.Partial
+				buf.TimeNano = msg.Timestamp.UnixNano()
+				buf.Source = msg.Source
+
+				if err := enc.WriteMsg(&buf); err != nil {
+					w.CloseWithError(err)
+					return
+				}
+			case err := <-watcher.Err:
+				w.CloseWithError(err)
+				return
 			}
+
+			buf.Reset()
 		}
-	}
-
-	stderr, err := os.Create(stderrPath)
-	if err != nil {
-		return errors.Wrapf(err, "error opening stderr log file at %s", stderrBase)
-	}
-	if err = stderr.Chown(uid, gid); err != nil {
-		return errors.Wrapf(err, "failed to chown %s to %d:%d", stderrPath, uid, gid)
-	}
-
-	stdout, err := os.Create(stdoutPath)
-	if err != nil {
-		return errors.Wrapf(err, "error opening stdout log file at %s", stdoutBase)
-	}
-	if err = stdout.Chown(uid, gid); err != nil {
-		return errors.Wrapf(err, "failed to chown %s to %d:%d", stdoutPath, uid, gid)
-	}
-
-	f, err := fifo.OpenFifo(context.Background(), fifopath, syscall.O_RDONLY, 0700)
-	if err != nil {
-		return errors.Wrapf(err, "error opening fifo file %s", fifopath)
-	}
-
-	filelogger := &FileLogger{
-		StderrPath: stderrPath,
-		StdoutPath: stdoutPath,
-		Stderr:     stderr,
-		Stdout:     stdout,
-		LogStream:  f,
-	}
-
-	d.mu.Lock()
-	d.logmap[fifopath] = filelogger
-	d.mu.Unlock()
-
-	go filelogger.StreamMessages()
-
-	return nil
-}
-
-// StopLogging terminates logging to files and closes them out.
-func (d *FileDriver) StopLogging(fifopath string) error {
-	d.mu.Lock()
-	fl, ok := d.logmap[fifopath]
-	if ok {
-		fl.LogStream.Close()
-		fl.Stderr.Close()
-		fl.Stdout.Close()
-		delete(d.logmap, fifopath)
-	}
-	d.mu.Unlock()
-	return nil
+	}()
+	return r, nil
 }

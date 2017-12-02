@@ -1,18 +1,6 @@
-FROM alpine
+FROM albamc/base:1.0
+MAINTAINER https://github.com/orgs/NAVER-CAMPUS-HACKDAY/teams/dockerloggingdriver
 
-RUN mkdir -p /run/docker/plugins /var/log/LoggingDriverTest
-
-COPY LoggingDriverTest /LoggingDriverTest
-
-ARG git_commit=unknown
-ARG version="2.9.0"
-ARG descriptive_version=unknown
-
-LABEL org.cyverse.git-ref="$git_commit"
-LABEL org.cyverse.version="$version"
-LABEL org.cyverse.descriptive-version="$descriptive_version"
-LABEL org.label-schema.vcs-ref="$git_commit"
-LABEL org.label-schema.vcs-url="https://github.com/JinHyukParkk/LoggingDriverTest"
-LABEL org.label-schema.version="$descriptive_version"
-
-CMD ["/LoggingDriverTest"]
+COPY . /go/src/github.com/JinHyukParkk/docker-log-driver-test
+RUN cd /go/src/github.com/JinHyukParkk/docker-log-driver-test && go get && go build --ldflags '-extldflags "-static"' -o /usr/bin/dockerloggingdriver
+RUN rm -rf /go /usr/local /usr/lib /usr/share

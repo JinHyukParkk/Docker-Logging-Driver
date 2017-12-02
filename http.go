@@ -2,82 +2,94 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 
-	"github.com/pkg/errors"
-
 	"github.com/docker/docker/daemon/logger"
+	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/go-plugins-helpers/sdk"
 )
 
-// StartRequest is the format of requests coming from Docker to the
-// /LogDriver.StartLogging endpoint.
-type StartRequest struct {
-	File string      // FIFO file path set up by Docker. Log messages will be written to it.
-	Info logger.Info // The struct defined by Docker. Can only depend on ContainerID being set.
+type StartLoggingRequest struct {
+	File string
+	Info logger.Info
 }
 
-// StopRequest is the format of requests coming from Docker to the
-// /LogDriver.StopLogging endpoint.
-type StopRequest struct {
-	File string // Corresponds to a FIFO path sent in a StartRequest by Docker.
+type StopLoggingRequest struct {
+	File string
 }
 
-// CapabilitiesResponse is the format of requests coming from Docker to the
-// /LogDriver.Capabilities endpoint
 type CapabilitiesResponse struct {
 	Err string
-	Cap logger.Capability // The struct defined by Docker. Only the ReadLogs field is supported for now.
+	Cap logger.Capability
 }
 
-// ErrorResponse is the format of responses to Docker when an error occurs.
-type ErrorResponse struct {
-	Err string
+type ReadLogsRequest struct {
+	Info   logger.Info
+	Config logger.ReadConfig
 }
 
-func respond(err error, w http.ResponseWriter) {
-	var r ErrorResponse
-	if err != nil {
-		r.Err = err.Error()
-	}
-	json.NewEncoder(w).Encode(&r)
-}
-
-func inithandlers(h *sdk.Handler, d LoggingDriver) {
+func handlers(h *sdk.Handler, d *driver) {
 	h.HandleFunc("/LogDriver.StartLogging", func(w http.ResponseWriter, r *http.Request) {
-		var (
-			err      error
-			startreq StartRequest
-		)
-		if err = json.NewDecoder(r.Body).Decode(&startreq); err != nil {
-			err = errors.Wrap(err, "error unmarshalling request body in /LogDriver.StartLogging handler")
+		var req StartLoggingRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if startreq.Info.ContainerID == "" {
-			respond(errors.New("ContainerID field is required in requests to /LogDriver.StartLogging"), w)
+		if req.Info.ContainerID == "" {
+			respond(errors.New("must provide container id in log context"), w)
 			return
 		}
-		err = d.StartLogging(startreq.File, startreq.Info)
+
+		err := d.StartLogging(req.File, req.Info)
 		respond(err, w)
 	})
 
 	h.HandleFunc("/LogDriver.StopLogging", func(w http.ResponseWriter, r *http.Request) {
-		var (
-			err     error
-			stopreq StopRequest
-		)
-		if err = json.NewDecoder(r.Body).Decode(&stopreq); err != nil {
-			err = errors.Wrap(err, "error unmarshalling request body in /LogDriver.StopLogging handler")
+		var req StopLoggingRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
-		err = d.StopLogging(stopreq.File)
+		err := d.StopLogging(req.File)
 		respond(err, w)
 	})
 
 	h.HandleFunc("/LogDriver.Capabilities", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&CapabilitiesResponse{
-			Cap: logger.Capability{ReadLogs: false},
+			Cap: logger.Capability{ReadLogs: true},
 		})
 	})
+
+	h.HandleFunc("/LogDriver.ReadLogs", func(w http.ResponseWriter, r *http.Request) {
+		var req ReadLogsRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		stream, err := d.ReadLogs(req.Info, req.Config)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer stream.Close()
+
+		w.Header().Set("Content-Type", "application/x-json-stream")
+		wf := ioutils.NewWriteFlusher(w)
+		io.Copy(wf, stream)
+	})
+}
+
+type response struct {
+	Err string
+}
+
+func respond(err error, w http.ResponseWriter) {
+	var res response
+	if err != nil {
+		res.Err = err.Error()
+	}
+	json.NewEncoder(w).Encode(&res)
 }
