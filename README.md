@@ -3,12 +3,13 @@
 
 
 ## 1. 구성 환경 
-* CentOs7, Docker
-* Docker Registry Container 실행
+* CentOs7
+* Docker daemon server 실행
+* Docker Registry - container 실행
 
 ## 2. 설치
 ```
-make 
+# make 
 ```
 
 
