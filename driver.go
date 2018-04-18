@@ -151,7 +151,6 @@ func (d *driver) ReadLogs(info logger.Info, config logger.ReadConfig) (io.ReadCl
 					w.Close()
 					return
 				}
-
 				buf.Line = msg.Line
 				buf.Partial = msg.Partial
 				buf.TimeNano = msg.Timestamp.UnixNano()
@@ -165,7 +164,6 @@ func (d *driver) ReadLogs(info logger.Info, config logger.ReadConfig) (io.ReadCl
 				w.CloseWithError(err)
 				return
 			}
-
 			buf.Reset()
 		}
 	}()
