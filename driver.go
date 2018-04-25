@@ -31,6 +31,7 @@ type logPair struct {
 	l      logger.Logger
 	stream io.ReadCloser
 	info   logger.Info
+	count  int
 }
 
 func newDriver() *driver {
@@ -69,7 +70,7 @@ func (d *driver) StartLogging(file string, logCtx logger.Info) error {
 	}
 
 	d.mu.Lock()
-	lf := &logPair{l, f, logCtx}
+	lf := &logPair{l, f, logCtx,1}
 	d.logs[file] = lf
 	d.idx[logCtx.ContainerID] = lf
 	d.mu.Unlock()
@@ -117,6 +118,20 @@ func consumeLog(lf *logPair) {
 			logrus.WithField("id", lf.info.ContainerID).WithError(err).WithField("message", msg).Error("error writing log message")
 			continue
 		}
+
+		file, err := os.Open(lf.info.LogPath)
+		if err != nil {
+			return
+		}
+		stat, err := file.Stat()
+		if err != nil {
+       		return
+		}
+		if stat.Size > (1024)*200 {
+			&lf.info.LogPath = lf.info.LogPath + strconv.Itoa(++lf.count)
+		}
+		file.Close()
+    }
 
 		buf.Reset()
 	}
