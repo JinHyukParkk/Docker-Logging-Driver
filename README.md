@@ -6,9 +6,9 @@
 ## 2. 구성 환경 
 * OS : CentOs7
 * Language : Golang
-* Execute : - Docker daemon server 
-*           - Docker Private Registry - container
-*           - Docker Logging Driver
+* Docker daemon server 
+* Docker Private Registry - container
+* Docker Logging Driver
 
 ## 3. 실행 방법
 ```
